@@ -1,0 +1,458 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[a4paper,margin=0.72in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\captionsetup{font=footnotesize,labelfont=bf}
+\setlength{\columnsep}{0.24in}
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{1em}
+\setlength{\textfloatsep}{8pt plus 1pt minus 2pt}
+\setlength{\floatsep}{7pt plus 1pt minus 2pt}
+\setlength{\intextsep}{7pt plus 1pt minus 2pt}
+
+\title{\vspace{-1.2em}\bf Network-Based Analysis of Team Performance in the FIFA World Cup 2022}
+\author{
+Rui Coelho, up202106772 \\
+Tiago Figueiredo, up202104640 \\
+Network Science Project
+}
+\date{}
+
+\begin{document}
+
+\twocolumn[
+\maketitle
+\begin{abstract}
+This work studies the FIFA World Cup 2022 through network representations built from match-level performance data. Starting from a tabular dataset with results and statistics for all tournament matches, we construct a signed match network and five analytical views: an outcome network for ranking, a statistical dominance network, an offensive efficiency network, a pressure/recovery network, and a team-style similarity network. The outcome network represents competitive success and is analysed with weighted PageRank. The dominance, efficiency, and pressure networks capture complementary performance dimensions, while the style network links teams with similar average profiles using cosine similarity. The results place Argentina and France at the top of the outcome-based ranking; Argentina, Brazil, Spain, England, and Germany rank highest in statistical dominance; the Netherlands leads offensive efficiency; and Morocco leads pressure/recovery. The style-similarity network organizes teams into interpretable groups, including possession/progression profiles, high-output teams, and transition-oriented teams. The project shows how a football tournament can be modelled through multiple network views, each addressing a different aspect of team performance.
+\end{abstract}
+\vspace{0.25em}
+]
+
+\section{Introduction}
+
+Football tournaments are naturally relational: teams play against other teams, results depend on opponents, and the value of a win is influenced by the strength of the defeated side. A traditional table of wins, draws, losses, and goals captures part of this structure, but it does not explicitly model the tournament as a network. Network Science provides a structured framework for this type of analysis because it treats teams as nodes and matches, performance differences, or style similarities as edges.
+
+The goal of this project is to analyse the FIFA World Cup 2022 using the concepts studied in the Network Science course. Instead of using a single graph representation, we build several networks from the same match dataset. This is motivated by the idea that the same domain can produce different networks depending on the meaning assigned to edges. A match result, a statistical advantage, and a similarity in playing style are all valid relations, but they answer different questions.
+
+The central research questions are:
+
+\begin{itemize}
+    \item Can network-based rankings reproduce competitive hierarchies?
+    \item Which teams benefit most from a ranking that values victories against strong opponents?
+    \item Which teams were statistically dominant across the tournament?
+    \item Which teams converted attacking actions into goals most efficiently?
+    \item Which teams relied most on pressure and recovery actions?
+    \item Do result-based networks and performance-based networks tell the same story?
+    \item Which teams have similar playing profiles according to match statistics?
+\end{itemize}
+
+The contribution of the work is an analysis pipeline that transforms a match-statistics CSV file into network datasets and then studies them using weighted rankings, centrality-inspired measures, graph density, components, clustering, and community detection. The generated networks follow the same general principle as sports networks found in collections such as KONECT: teams are nodes and matches induce directed weighted edges.
+
+\section{Dataset}
+
+The dataset used in this project is the local file:
+
+\begin{center}
+\texttt{world\_cup\_2022/Fifa\_world\_cup\_matches.csv}
+\end{center}
+
+It contains 64 matches from the FIFA World Cup 2022 and 32 national teams. Each row corresponds to one match and includes the two teams, score, date, stage, possession values, attempts, attempts on target, assists, passes, completed passes, crosses, corners, line breaks, fouls, cards, turnovers, defensive pressure, and related performance indicators.
+
+The fields used in the analysis include:
+
+\begin{itemize}
+    \item result variables: goals, goal difference, match outcome;
+    \item attacking variables: total attempts, attempts on target, attempts inside the penalty area;
+    \item efficiency variables derived from the original data: goals per attempt, goals per attempt on target, and shot accuracy;
+    \item possession and construction variables: possession, passes completed, line breaks;
+    \item pressure and transition variables: forced turnovers and defensive pressures;
+    \item set-piece variables: corners and crosses.
+\end{itemize}
+
+The dataset includes 172 goals, corresponding to 2.69 goals per match. In the original team order of the file, team1 wins 29 matches, team2 wins 20 matches, and 15 matches end in a draw. The average absolute goal difference is 1.41.
+
+\section{Network Construction}
+
+The first stage of the project is network construction. The original file is not stored as an edge list, so we transform the match table into several graph representations. Each graph has national teams as nodes, but the edge semantics change according to the analysis objective.
+
+\subsection{Signed Match Network}
+
+The first graph follows a KONECT-style representation of sports results. For each match, we create one directed signed edge:
+
+\begin{equation}
+    e = (\text{team1}, \text{team2}, w),
+\end{equation}
+
+where
+
+\begin{equation}
+    w = \text{goals}_{team1} - \text{goals}_{team2}.
+\end{equation}
+
+A positive edge means that team1 won, a negative edge means that team2 won, and zero represents a draw. This network preserves the original match orientation and stores the result as a signed weight.
+
+\subsection{Outcome Ranking Network}
+
+For ranking, we use a second directed network in which edges point toward competitive success. If team $A$ defeats team $B$, we add:
+
+\begin{equation}
+    B \rightarrow A, \quad w = 3.
+\end{equation}
+
+For a draw, we add two reciprocal edges:
+
+\begin{equation}
+    A \rightarrow B, \quad B \rightarrow A, \quad w = 1.
+\end{equation}
+
+This construction mirrors the logic of points in football while allowing recursive ranking. A team receives importance not just from winning, but from being supported by results against other relevant teams.
+
+\subsection{Statistical Dominance Network}
+
+The third graph captures performance dominance. For each match, we compare the two teams using a set of normalized statistical differences. The features are:
+
+\begin{itemize}
+    \item possession;
+    \item total attempts;
+    \item attempts on target;
+    \item attempts inside the penalty area;
+    \item completed passes;
+    \item corners;
+    \item completed line breaks;
+    \item completed defensive line breaks;
+    \item forced turnovers;
+    \item defensive pressures applied.
+\end{itemize}
+
+For feature $f$, the difference in a match is standardized by the standard deviation of that feature across matches:
+
+\begin{equation}
+    z_f(A,B) = \frac{x_f(A) - x_f(B)}{\sigma_f}.
+\end{equation}
+
+The dominance score is the mean standardized difference:
+
+\begin{equation}
+    D(A,B) = \frac{1}{|F|}\sum_{f \in F} z_f(A,B).
+\end{equation}
+
+If $D(A,B) > 0$, we add an edge $A \rightarrow B$ with weight $D(A,B)$. Otherwise, we add $B \rightarrow A$ with weight $|D(A,B)|$. This produces a directed weighted network in which edges point from the statistically dominant team to the opponent.
+
+\subsection{Offensive Efficiency Network}
+
+The offensive efficiency network focuses on conversion rather than volume. For each team in each match, we derive:
+
+\begin{itemize}
+    \item goals per attempt;
+    \item goals per attempt on target;
+    \item shot accuracy;
+    \item goals per completed pass.
+\end{itemize}
+
+These variables capture how effectively a team transformed possession and shots into goals. As with the dominance network, differences are standardized across matches and averaged into an efficiency score:
+
+\begin{equation}
+    E(A,B) = \frac{1}{|F_E|}\sum_{f \in F_E} \frac{x_f(A) - x_f(B)}{\sigma_f}.
+\end{equation}
+
+The edge is directed from the more efficient team to the less efficient opponent, with weight $|E(A,B)|$.
+
+\subsection{Pressure and Recovery Network}
+
+The pressure/recovery network measures defensive disruption. It uses two variables:
+
+\begin{itemize}
+    \item defensive pressures applied;
+    \item forced turnovers.
+\end{itemize}
+
+For every match, we compute a standardized pressure/recovery score:
+
+\begin{equation}
+    R(A,B) = \frac{1}{|F_R|}\sum_{f \in F_R} \frac{x_f(A) - x_f(B)}{\sigma_f}.
+\end{equation}
+
+If $R(A,B)>0$, the edge points from $A$ to $B$; otherwise, it points from $B$ to $A$. This network highlights teams that consistently imposed defensive pressure and recovered possession.
+
+\subsection{Style Similarity Network}
+
+The final graph connects teams with similar playing profiles. First, we aggregate each team's match statistics by averaging its features across the tournament. Then all features are standardized. Let $\mathbf{x}_i$ be the standardized feature vector of team $i$. Similarity between teams is computed with cosine similarity:
+
+\begin{equation}
+    s(i,j) = \frac{\mathbf{x}_i \cdot \mathbf{x}_j}{\|\mathbf{x}_i\|\|\mathbf{x}_j\|}.
+\end{equation}
+
+For each team, we connect it to its four nearest neighbours in this similarity space. The graph is then symmetrized, producing an undirected weighted style network.
+
+\begin{table}[t]
+\centering
+\caption{Constructed networks and their edge semantics.}
+\label{tab:networks}
+\small
+\begin{tabular}{p{0.22\linewidth}p{0.19\linewidth}p{0.43\linewidth}}
+\toprule
+Network & Type & Edge meaning \\
+\midrule
+Signed & Directed signed & \texttt{team1} plays \texttt{team2}; weight is goal difference. \\
+Outcome & Directed weighted & Edge points from defeated team to winner; draws are reciprocal. \\
+Dominance & Directed weighted & Edge points from statistically dominant team to opponent. \\
+Efficiency & Directed weighted & Edge points from team with better attacking conversion to opponent. \\
+Pressure & Directed weighted & Edge points from team with stronger pressure and recovery profile to opponent. \\
+Style & Undirected weighted & Edge links teams with similar average performance profiles. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Methods}
+
+\subsection{Weighted PageRank}
+
+The outcome network is analysed using weighted PageRank. PageRank was originally introduced for ranking web pages according to the recursive importance of incoming links~\cite{brin1998pagerank}. In this project, a team is important if it receives result-based support from other teams, especially from teams that are themselves important.
+
+Given a weighted adjacency matrix $W$, we construct a row-normalized transition matrix $P$. The PageRank vector $\mathbf{r}$ is computed iteratively:
+
+\begin{equation}
+    \mathbf{r}_{t+1} = \alpha P^T \mathbf{r}_t + (1-\alpha)\frac{\mathbf{1}}{n},
+\end{equation}
+
+with damping factor $\alpha = 0.85$. This produces a ranking in which wins and draws are interpreted through the structure of the tournament graph.
+
+The same weighted PageRank idea is also applied to the statistical dominance network after reversing dominance edges. This makes teams receive rank from opponents they dominated statistically.
+
+\subsection{Strength and Degree}
+
+For each directed weighted graph, we compute:
+
+\begin{itemize}
+    \item in-degree and out-degree;
+    \item in-strength and out-strength;
+    \item net outcome strength;
+    \item net statistical dominance.
+    \item net offensive efficiency;
+    \item net pressure/recovery.
+\end{itemize}
+
+For the dominance, efficiency, and pressure/recovery networks, edges point from the team with the stronger score to the opponent. Therefore, the corresponding net score is computed as:
+
+\begin{equation}
+    S_{net}(v) = S_{out}(v) - S_{in}(v),
+\end{equation}
+
+where $S_{out}$ is the total score exerted by team $v$, and $S_{in}$ is the total score received from opponents.
+
+\subsection{Components, Density, and Clustering}
+
+For each graph, we compute the number of nodes, number of edges, density, weak components, strong components for directed graphs, and average clustering for the undirected style network. These metrics provide an overview of the structural organization produced by each construction.
+
+\subsection{Style Communities}
+
+The style network is analysed with weighted label propagation. Label propagation is a fast community-detection method in which each node iteratively adopts the most frequent label among its neighbours~\cite{raghavan2007label}. In our weighted version, neighbour labels are counted according to edge weights. The resulting communities group teams with similar statistical profiles.
+
+\section{Results}
+
+\subsection{Network-Level Properties}
+
+Table~\ref{tab:metrics} summarizes the main properties of the constructed networks. The outcome PageRank network has 78 directed aggregated edges and density 0.079. The statistical dominance and offensive efficiency networks have 63 directed aggregated edges each, while the pressure/recovery network has 64. The style similarity network has 88 undirected edges and density 0.177, with average clustering coefficient 0.470.
+
+\begin{table}[t]
+\centering
+\caption{Network-level metrics.}
+\label{tab:metrics}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Network & Nodes & Edges & Density & Clust. \\
+\midrule
+Outcome PageRank & 32 & 78 & 0.079 & -- \\
+Stat. dominance & 32 & 63 & 0.064 & -- \\
+Off. efficiency & 32 & 63 & 0.064 & -- \\
+Pressure/recovery & 32 & 64 & 0.065 & -- \\
+Style similarity & 32 & 88 & 0.177 & 0.470 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All constructed networks contain all 32 teams in a single connected component when direction is ignored. This indicates that the tournament structure generates a connected relational system under each edge definition. The style network's clustering coefficient shows that similarity is not uniformly distributed: teams tend to form local groups of comparable performance profiles.
+
+\subsection{Outcome-Based Ranking}
+
+Table~\ref{tab:rankings} compares the main rankings. The points ranking places France first, followed by Argentina. The outcome PageRank reverses these two teams, placing Argentina first and France second. This is consistent with the final result and with Argentina's path through the tournament.
+
+The PageRank ranking also highlights teams whose victories were structurally valuable. Tunisia and Saudi Arabia appear third and fourth in outcome PageRank because they defeated France and Argentina, respectively. This behaviour is expected from a recursive ranking: beating a highly ranked team contributes more than beating an isolated low-ranked team.
+
+\begin{table*}[t]
+\centering
+\caption{Top teams under five ranking views.}
+\label{tab:rankings}
+\small
+\begin{tabular}{rlllll}
+\toprule
+Rank & Points & Outcome PR & Stat. dominance & Off. efficiency & Pressure/recovery \\
+\midrule
+1 & France & Argentina & Argentina & Netherlands & Morocco \\
+2 & Argentina & France & Brazil & England & Japan \\
+3 & Netherlands & Tunisia & Spain & France & Costa Rica \\
+4 & Morocco & Saudi Arabia & England & Morocco & Poland \\
+5 & England & Australia & Germany & Australia & Netherlands \\
+6 & Brazil & Netherlands & France & Brazil & France \\
+7 & Croatia & Poland & Portugal & Japan & Australia \\
+8 & Portugal & Mexico & Mexico & Portugal & Cameroon \\
+9 & Japan & Croatia & United States & Cameroon & Ghana \\
+10 & Senegal & Japan & Croatia & Saudi Arabia & Iran \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The correlation between points and outcome PageRank is 0.668 using Pearson correlation and 0.645 using Spearman rank correlation. This shows that PageRank captures tournament success while still introducing a network-specific interpretation of opponent quality.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.93\linewidth]{figures/top_outcome_pagerank.png}
+\caption{Top teams by outcome-based PageRank.}
+\label{fig:pagerank}
+\end{figure}
+
+\subsection{Statistical Dominance}
+
+The statistical dominance network emphasizes match control. Argentina has the highest net dominance score, followed by Brazil, Spain, England, and Germany. France, the points leader, appears sixth in dominance. This separates competitive achievement from statistical superiority during matches.
+
+The relationship between tournament points and statistical dominance is shown in Figure~\ref{fig:points-dominance}. Argentina combines high points with the highest dominance score. France also combines high points with positive dominance, while Brazil, Spain, England, and Germany record high statistical profiles. Morocco and Australia occupy a different area of the dominance space, reflecting a tournament profile based on efficiency and resilience rather than sustained statistical control.
+
+Dominance is more closely associated with goal difference than with total points. The Pearson correlation between goal difference and statistical dominance is 0.736, while the correlation between points and statistical dominance is 0.486. This suggests that the dominance network captures match control and scoring margin more directly than the tournament points table.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.93\linewidth]{figures/points_vs_statistical_dominance.png}
+\caption{Tournament points compared with net statistical dominance.}
+\label{fig:points-dominance}
+\end{figure}
+
+\subsection{Offensive Efficiency}
+
+The offensive efficiency network measures how teams converted attacking actions into goals. This network is distinct from statistical dominance: a team can dominate possession and shots without being the most efficient finisher, and a team can be efficient without controlling the match statistically.
+
+The Netherlands ranks first by net offensive efficiency, followed by England, France, Morocco, and Australia. This ranking rewards conversion and shot quality indicators rather than attacking volume alone. England and France combine high points with high efficiency, while Morocco and Australia appear high because they translated fewer attacking phases into valuable outcomes.
+
+Offensive efficiency is closely aligned with the tournament result structure. Its Pearson correlation with points is 0.704 and its Spearman rank correlation with points is 0.658. It also correlates with goal difference, with Pearson correlation 0.698 and Spearman correlation 0.723. This makes conversion-oriented performance a direct connection between match statistics and competitive outcome.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.93\linewidth]{figures/top_offensive_efficiency.png}
+\caption{Top teams by net offensive efficiency.}
+\label{fig:offensive-efficiency}
+\end{figure}
+
+\subsection{Pressure and Recovery}
+
+The pressure/recovery network captures defensive disruption. It measures the extent to which teams applied defensive pressure and forced turnovers relative to their opponents. Morocco ranks first, followed by Japan, Costa Rica, Poland, and the Netherlands. This ranking is consistent with teams that relied on defensive organization, compactness, and transition opportunities.
+
+Unlike offensive efficiency, pressure/recovery is not closely correlated with points. The Pearson correlation with points is 0.023, and the Spearman correlation is approximately zero. It is also negatively correlated with statistical dominance, with Pearson correlation $-0.709$. This indicates that pressure/recovery identifies a separate strategic profile: several teams that did not dominate the ball still generated defensive disruption.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.93\linewidth]{figures/top_pressure_recovery.png}
+\caption{Top teams by net pressure/recovery.}
+\label{fig:pressure-recovery}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.93\linewidth]{figures/efficiency_vs_pressure_recovery.png}
+\caption{Relationship between offensive efficiency and pressure/recovery.}
+\label{fig:eff-pressure}
+\end{figure}
+
+\subsection{Style Similarity and Communities}
+
+The style similarity network groups teams according to average performance profiles. The graph was built from standardized features such as possession, attempts, passes completed, line breaks, corners, turnovers, and defensive pressure. Four communities were identified:
+
+\begin{itemize}
+    \item Community 1: Australia, Cameroon, Canada, Costa Rica, Ecuador, Ghana, Iran, Japan, Morocco, Netherlands, Poland, Qatar, Saudi Arabia, Senegal, Serbia, Switzerland, Tunisia, Uruguay, Wales.
+    \item Community 2: Croatia, Denmark, Spain, United States.
+    \item Community 3: Argentina, Brazil, France, Germany, Mexico.
+    \item Community 4: Belgium, England, Korea Republic, Portugal.
+\end{itemize}
+
+Community 3 contains several high-output teams, including the champion Argentina, finalist France, Brazil, and Germany. Community 2 is characterized by ball-circulation and progression profiles, especially Spain and Croatia. Community 4 groups teams with comparable offensive volume and wide progression indicators. Community 1 is the largest and includes several teams with reactive or transition-oriented profiles.
+
+\begin{center}
+\centering
+\includegraphics[width=0.88\linewidth]{figures/style_similarity_network.png}
+\captionof{figure}{Style similarity network. Nodes are teams and edges connect statistically similar teams. Colours represent communities found by weighted label propagation.}
+\label{fig:style-network}
+\end{center}
+
+The heatmap in Figure~\ref{fig:heatmap} reinforces these groupings. Spain has high values in possession and completed passes. Germany and Brazil have high shot volume and corner counts. Japan, Costa Rica, and Morocco appear high in defensive pressure, showing a profile based on disruption and transition.
+
+\begin{center}
+\centering
+\includegraphics[width=0.98\linewidth]{figures/team_performance_heatmap.png}
+\captionof{figure}{Standardized average performance profile by team. Teams are ordered by points ranking.}
+\label{fig:heatmap}
+\end{center}
+
+\subsection{Comparing Result and Performance Views}
+
+The result and dominance networks are complementary. Outcome PageRank emphasizes who beat whom, while statistical dominance emphasizes how matches were played. Their Pearson correlation is 0.265 and their Spearman correlation is 0.119, showing that they encode different types of information.
+
+Argentina ranks first in both outcome PageRank and statistical dominance. France is second in outcome PageRank and sixth in dominance. Brazil and Spain rank higher in dominance than in outcome PageRank, which reflects their match-control profiles. Tunisia and Saudi Arabia rank higher in outcome PageRank than in dominance because their key wins were against the two finalists.
+
+The efficiency and pressure networks add two further layers. Offensive efficiency is closely related to points and goal difference, so it helps explain why some teams translated fewer or comparable opportunities into better outcomes. Pressure/recovery behaves differently: Morocco and Japan are highly ranked in this view, showing a profile based on disruption and regain rather than sustained statistical dominance.
+
+This comparison is one of the central benefits of a network-based analysis. A single official table cannot separate opponent-sensitive results, statistical control, attacking conversion, and defensive disruption, but the combination of multiple networks can.
+
+\section{Discussion}
+
+The constructed networks assign different meanings to football relations. The signed match network is closest to a standard sports edge list, while the outcome network transforms results into a recursive ranking problem. Weighted PageRank captures the idea that defeating a well-ranked opponent carries more structural value than defeating a team with little support from the rest of the graph.
+
+The statistical dominance network adds an independent performance layer by measuring which teams accumulated statistical advantages over their opponents. This explains why teams such as Brazil, Spain, England, and Germany rank highly: they produced high performance indicators even when their final tournament outcome differed from their match statistics.
+
+The offensive efficiency and pressure/recovery networks describe two additional mechanisms. Efficiency links the statistical layer with the result layer because it correlates with points and goal difference. Pressure/recovery identifies teams whose performance is better described by defensive disruption, compactness, and regain actions than by possession or shot volume.
+
+The style similarity network shifts the analysis from competition to profile comparison. It allows teams to be grouped by how they played, regardless of whether they faced each other. Together, the networks show that competitive success, statistical dominance, offensive efficiency, pressure/recovery, and stylistic similarity are related but not equivalent.
+
+\section{Conclusion}
+
+This project transformed FIFA World Cup 2022 match statistics into several network datasets and analysed them using Network Science concepts. The outcome PageRank network ranked Argentina first and France second, while also highlighting structurally valuable wins by Tunisia and Saudi Arabia. The statistical dominance network identified Argentina, Brazil, Spain, England, and Germany as the leading teams in aggregated match control. The offensive efficiency network highlighted the Netherlands, England, France, Morocco, and Australia as the main conversion profiles, and the pressure/recovery network identified Morocco and Japan as leading teams in defensive disruption and regain actions.
+
+The style similarity network grouped teams into four communities and showed how teams can be compared through performance profiles rather than results alone. Overall, changing the edge definition makes it possible to move from match outcomes to statistical superiority, offensive efficiency, pressure/recovery, and stylistic similarity. This connects the project directly with the course topics of weighted directed graphs, centrality, PageRank, community detection, clustering, and network comparison.
+
+\begin{thebibliography}{9}
+
+\bibitem{brin1998pagerank}
+S. Brin and L. Page.
+\newblock The anatomy of a large-scale hypertextual web search engine.
+\newblock \emph{Computer Networks and ISDN Systems}, 30(1--7):107--117, 1998.
+
+\bibitem{raghavan2007label}
+U. N. Raghavan, R. Albert, and S. Kumara.
+\newblock Near linear time algorithm to detect community structures in large-scale networks.
+\newblock \emph{Physical Review E}, 76(3):036106, 2007.
+
+\bibitem{newman2010networks}
+M. E. J. Newman.
+\newblock \emph{Networks: An Introduction}.
+\newblock Oxford University Press, 2010.
+
+\bibitem{barabasi2016network}
+A.-L. Barabási.
+\newblock \emph{Network Science}.
+\newblock Cambridge University Press, 2016.
+
+\bibitem{leskovec2020mining}
+J. Leskovec, A. Rajaraman, and J. D. Ullman.
+\newblock \emph{Mining of Massive Datasets}.
+\newblock Cambridge University Press, 3rd edition, 2020.
+
+\end{thebibliography}
+
+\end{document}

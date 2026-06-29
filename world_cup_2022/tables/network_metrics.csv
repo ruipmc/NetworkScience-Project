@@ -1,0 +1,6 @@
+network,nodes,edges,density,avg_in_degree,avg_out_degree,weak_components,largest_weak_component,strong_components,largest_strong_component,avg_clustering
+Outcome PageRank network,32,78,0.07862903225806452,2.4375,2.4375,1,32,4,15,
+Statistical dominance network,32,63,0.06350806451612903,1.96875,1.96875,1,32,30,3,
+Offensive efficiency network,32,63,0.06350806451612903,1.96875,1.96875,1,32,17,7,
+Pressure/recovery network,32,64,0.06451612903225806,2.0,2.0,1,32,26,3,
+Style similarity network,32,88,0.1774193548387097,,,1,32,,,0.4701659451659452
