@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+outputs/
+world_cup_2022/networks/
+world_cup_2022/tables/
+
+paper/*.aux
+paper/*.log
+paper/missfont.log

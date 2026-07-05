@@ -1,4 +1,4 @@
-"""Shared helpers for network edge builders."""
+"""Shared builders for score-based World Cup 2022 networks."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+
+from ..config import OFFENSIVE_EFFICIENCY_FEATURES, PRESSURE_RECOVERY_FEATURES
 
 
 def build_score_edges_from_team_matches(
@@ -69,6 +71,22 @@ def build_score_edges_from_team_matches(
     return pd.DataFrame(rows)
 
 
+def build_offensive_efficiency_edges(team_matches: pd.DataFrame) -> pd.DataFrame:
+    return build_score_edges_from_team_matches(
+        team_matches,
+        OFFENSIVE_EFFICIENCY_FEATURES,
+        "offensive_efficiency",
+    )
+
+
+def build_pressure_recovery_edges(team_matches: pd.DataFrame) -> pd.DataFrame:
+    return build_score_edges_from_team_matches(
+        team_matches,
+        PRESSURE_RECOVERY_FEATURES,
+        "pressure_recovery",
+    )
+
+
 def aggregate_directed_edges(edges: pd.DataFrame) -> pd.DataFrame:
     if edges.empty:
         return pd.DataFrame(columns=["source", "target", "weight", "edge_count"])
@@ -77,4 +95,3 @@ def aggregate_directed_edges(edges: pd.DataFrame) -> pd.DataFrame:
         .agg(weight=("weight", "sum"), edge_count=("weight", "size"))
         .sort_values(["source", "target"])
     )
-

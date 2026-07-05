@@ -13,11 +13,13 @@ from .metrics import (
     label_propagation_communities,
     weighted_pagerank,
 )
-from .networks.common import aggregate_directed_edges
 from .networks.match_signed import build_match_signed_edges
-from .networks.offensive_efficiency import build_offensive_efficiency_edges
 from .networks.outcome import build_outcome_edges
-from .networks.pressure_recovery import build_pressure_recovery_edges
+from .networks.score_based import (
+    aggregate_directed_edges,
+    build_offensive_efficiency_edges,
+    build_pressure_recovery_edges,
+)
 from .networks.statistical_dominance import build_statistical_dominance_edges
 from .networks.style_similarity import build_style_similarity_edges
 from .plots import (
@@ -166,4 +168,3 @@ def write_outputs(input_csv: Path, output_dir: Path) -> None:
     print(f"  tables: {tables_dir}")
     print(f"  networks: {networks_dir}")
     print(f"  figures: {figures_dir}")
-
