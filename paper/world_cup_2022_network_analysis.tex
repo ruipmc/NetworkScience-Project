@@ -34,8 +34,12 @@ Network Science Project
 \begin{abstract}
 This work studies the FIFA World Cup 2022 through network representations built from match-level performance data. Starting from a tabular dataset with results and statistics for all tournament matches, we construct a signed match network and five analytical views: an outcome network for ranking, a statistical dominance network, an offensive efficiency network, a pressure/recovery network, and a team-style similarity network. The outcome network represents competitive success and is analysed with weighted PageRank. The dominance, efficiency, and pressure networks capture complementary performance dimensions, while the style network links teams with similar average profiles using cosine similarity. The results place Argentina and France at the top of the outcome-based ranking; Argentina, Brazil, Spain, England, and Germany rank highest in statistical dominance; the Netherlands leads offensive efficiency; and Morocco leads pressure/recovery. The style-similarity network organizes teams into interpretable groups, including possession/progression profiles, high-output teams, and transition-oriented teams. The project shows how a football tournament can be modelled through multiple network views, each addressing a different aspect of team performance.
 \end{abstract}
-\vspace{0.25em}
+\vspace{0.30em}
 ]
+
+\
+
+\vspace{0.10em}
 
 \section{Introduction}
 
@@ -88,15 +92,15 @@ The first stage of the project is network construction. The original file is not
 
 The first graph follows a KONECT-style representation of sports results. For each match, we create one directed signed edge:
 
-\begin{equation}
+\[
     e = (\text{team1}, \text{team2}, w),
-\end{equation}
+\]
 
 where
 
-\begin{equation}
+\[
     w = \text{goals}_{team1} - \text{goals}_{team2}.
-\end{equation}
+\]
 
 A positive edge means that team1 won, a negative edge means that team2 won, and zero represents a draw. This network preserves the original match orientation and stores the result as a signed weight.
 
@@ -104,15 +108,15 @@ A positive edge means that team1 won, a negative edge means that team2 won, and 
 
 For ranking, we use a second directed network in which edges point toward competitive success. If team $A$ defeats team $B$, we add:
 
-\begin{equation}
+\[
     B \rightarrow A, \quad w = 3.
-\end{equation}
+\]
 
 For a draw, we add two reciprocal edges:
 
-\begin{equation}
+\[
     A \rightarrow B, \quad B \rightarrow A, \quad w = 1.
-\end{equation}
+\]
 
 This construction mirrors the logic of points in football while allowing recursive ranking. A team receives importance not just from winning, but from being supported by results against other relevant teams.
 
@@ -135,15 +139,15 @@ The third graph captures performance dominance. For each match, we compare the t
 
 For feature $f$, the difference in a match is standardized by the standard deviation of that feature across matches:
 
-\begin{equation}
+\[
     z_f(A,B) = \frac{x_f(A) - x_f(B)}{\sigma_f}.
-\end{equation}
+\]
 
 The dominance score is the mean standardized difference:
 
-\begin{equation}
+\[
     D(A,B) = \frac{1}{|F|}\sum_{f \in F} z_f(A,B).
-\end{equation}
+\]
 
 If $D(A,B) > 0$, we add an edge $A \rightarrow B$ with weight $D(A,B)$. Otherwise, we add $B \rightarrow A$ with weight $|D(A,B)|$. This produces a directed weighted network in which edges point from the statistically dominant team to the opponent.
 
@@ -158,13 +162,14 @@ The offensive efficiency network focuses on conversion rather than volume. For e
     \item goals per completed pass.
 \end{itemize}
 
-These variables capture how effectively a team transformed possession and shots into goals. As with the dominance network, differences are standardized across matches and averaged into an efficiency score:
+These variables capture how effectively a team transformed possession and shots into goals. For each match, we compare the two teams on each efficiency variable. Each difference is first divided by the standard deviation of that variable, so that variables with larger raw values do not dominate the score. We then average those normalized differences:
 
-\begin{equation}
-    E(A,B) = \frac{1}{|F_E|}\sum_{f \in F_E} \frac{x_f(A) - x_f(B)}{\sigma_f}.
-\end{equation}
+\[
+    E(A,B) = \frac{1}{|F_E|}\sum_{f \in F_E}
+    \frac{x_f(A)-x_f(B)}{\sigma_f}.
+\]
 
-The edge is directed from the more efficient team to the less efficient opponent, with weight $|E(A,B)|$.
+Here, $F_E$ is the set of efficiency features and $|F_E|$ is the number of features in that set. A positive value means that team $A$ was more efficient than team $B$ in that match. The edge is directed from the more efficient team to the less efficient opponent, with weight $|E(A,B)|$.
 
 \subsection{Pressure and Recovery Network}
 
@@ -175,21 +180,22 @@ The pressure/recovery network measures defensive disruption. It uses two variabl
     \item forced turnovers.
 \end{itemize}
 
-For every match, we compute a standardized pressure/recovery score:
+For every match, we compare the two teams on these two variables. As before, each difference is first divided by the standard deviation of that variable, and the normalized differences are then averaged:
 
-\begin{equation}
-    R(A,B) = \frac{1}{|F_R|}\sum_{f \in F_R} \frac{x_f(A) - x_f(B)}{\sigma_f}.
-\end{equation}
+\[
+    R(A,B) = \frac{1}{|F_R|}\sum_{f \in F_R}
+    \frac{x_f(A)-x_f(B)}{\sigma_f}.
+\]
 
-If $R(A,B)>0$, the edge points from $A$ to $B$; otherwise, it points from $B$ to $A$. This network highlights teams that consistently imposed defensive pressure and recovered possession.
+Here, $F_R$ contains defensive pressures applied and forced turnovers, so $|F_R|=2$. A positive value means that team $A$ had the stronger pressure/recovery profile in that match. If $R(A,B)>0$, the edge points from $A$ to $B$; otherwise, it points from $B$ to $A$. This network highlights teams that consistently imposed defensive pressure and recovered possession.
 
 \subsection{Style Similarity Network}
 
 The final graph connects teams with similar playing profiles. First, we aggregate each team's match statistics by averaging its features across the tournament. Then all features are standardized. Let $\mathbf{x}_i$ be the standardized feature vector of team $i$. Similarity between teams is computed with cosine similarity:
 
-\begin{equation}
+\[
     s(i,j) = \frac{\mathbf{x}_i \cdot \mathbf{x}_j}{\|\mathbf{x}_i\|\|\mathbf{x}_j\|}.
-\end{equation}
+\]
 
 For each team, we connect it to its four nearest neighbours in this similarity space. The graph is then symmetrized, producing an undirected weighted style network.
 
@@ -220,9 +226,9 @@ The outcome network is analysed using weighted PageRank. PageRank was originally
 
 Given a weighted adjacency matrix $W$, we construct a row-normalized transition matrix $P$. The PageRank vector $\mathbf{r}$ is computed iteratively:
 
-\begin{equation}
+\[
     \mathbf{r}_{t+1} = \alpha P^T \mathbf{r}_t + (1-\alpha)\frac{\mathbf{1}}{n},
-\end{equation}
+\]
 
 with damping factor $\alpha = 0.85$. This produces a ranking in which wins and draws are interpreted through the structure of the tournament graph.
 
@@ -243,9 +249,9 @@ For each directed weighted graph, we compute:
 
 For the dominance, efficiency, and pressure/recovery networks, edges point from the team with the stronger score to the opponent. Therefore, the corresponding net score is computed as:
 
-\begin{equation}
+\[
     S_{net}(v) = S_{out}(v) - S_{in}(v),
-\end{equation}
+\]
 
 where $S_{out}$ is the total score exerted by team $v$, and $S_{in}$ is the total score received from opponents.
 
